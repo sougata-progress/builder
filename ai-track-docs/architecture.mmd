@@ -1,0 +1,49 @@
+%%{init: {"theme": "default"}}%%
+graph TD
+    subgraph Clients
+        CLI["hab CLI"]
+        Browser["Browser / Web UI"]
+    end
+
+    subgraph Edge
+        Proxy["builder-api-proxy\n(Nginx / TLS)"]
+    end
+
+    subgraph API_Tier["API Tier"]
+        API["builder-api\n(Rust / Actix-web)"]
+        Core["builder-core\n(shared types)"]
+        Proto["builder-protocol\n(Protobuf messages)"]
+    end
+
+    subgraph Auth
+        OAuth["oauth-client"]
+        GH["github-api-client"]
+    end
+
+    subgraph Data_Tier["Data Tier"]
+        DB["builder-db\n(Diesel / PostgreSQL)"]
+        PG[("PostgreSQL")]
+        Cache["builder-memcached\n(Memcached)"]
+        Minio["builder-minio\n(S3 / MinIO)"]
+        Artifactory["artifactory-client"]
+    end
+
+    subgraph Frontend
+        Web["builder-web\n(TypeScript / Angular)"]
+    end
+
+    CLI -->|HTTPS| Proxy
+    Browser -->|HTTPS| Proxy
+    Browser -->|static assets| Web
+    Proxy --> API
+
+    API --> Core
+    API --> Proto
+    API --> OAuth
+    API --> GH
+    API --> DB
+    API --> Cache
+    API --> Minio
+    API --> Artifactory
+
+    DB --> PG
