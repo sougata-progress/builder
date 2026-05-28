@@ -23,6 +23,13 @@ pub const DEFAULT_ARTIFACTORY_API_URL: &str = "http://localhost:8081";
 /// Override via `ArtifactoryCfg::repo` for custom repository layouts.
 pub const DEFAULT_ARTIFACTORY_REPO: &str = "habitat-artifact-store";
 
+/// Default per-request HTTP timeout in seconds.
+///
+/// 30 seconds is a conservative upper bound: Artifactory uploads can be slow
+/// for large `.hart` files on a congested network, but anything beyond 30 s
+/// almost certainly indicates a hung connection rather than a slow transfer.
+pub const DEFAULT_TIMEOUT_SECS: u64 = 30;
+
 /// Runtime configuration for [`ArtifactoryClient`](crate::ArtifactoryClient).
 ///
 /// Deserialized from the `[artifactory]` table in the service TOML config.
@@ -52,6 +59,19 @@ pub struct ArtifactoryCfg {
     /// require_https = true
     /// ```
     pub require_https: bool,
+    /// Per-request HTTP timeout in seconds.
+    ///
+    /// Applied to every `upload`, `download`, and `delete` call. A value of
+    /// `0` is rejected by [`ArtifactoryClient::new`](crate::ArtifactoryClient::new)
+    /// with [`ArtifactoryError::InvalidConfig`] because a zero timeout would
+    /// immediately cancel every request.
+    ///
+    /// Set via TOML:
+    /// ```toml
+    /// [artifactory]
+    /// timeout_secs = 60   # allow 60 s for large uploads
+    /// ```
+    pub timeout_secs: u64,
 }
 
 impl Default for ArtifactoryCfg {
@@ -63,6 +83,7 @@ impl Default for ArtifactoryCfg {
             api_key: String::new(),
             repo: DEFAULT_ARTIFACTORY_REPO.to_string(),
             require_https: false,
+            timeout_secs: DEFAULT_TIMEOUT_SECS,
         }
     }
 }
@@ -83,6 +104,10 @@ mod tests {
         assert!(
             !cfg.require_https,
             "require_https should be false by default (allows HTTP for local dev)"
+        );
+        assert_eq!(
+            cfg.timeout_secs, DEFAULT_TIMEOUT_SECS,
+            "timeout_secs should default to DEFAULT_TIMEOUT_SECS"
         );
     }
 

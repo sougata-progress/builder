@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashMap, path::Path, time::Instant};
+use std::{
+    collections::HashMap,
+    path::Path,
+    time::{Duration, Instant},
+};
 
 use crate::{
     config::ArtifactoryCfg,
@@ -41,6 +45,7 @@ pub struct ArtifactoryClient {
     pub api_url: String,
     pub api_key: String,
     pub repo: String,
+    timeout: Duration,
 }
 
 impl ArtifactoryClient {
@@ -53,12 +58,19 @@ impl ArtifactoryClient {
     ///   header value (e.g. ASCII control characters).
     /// - `config.require_https` is `true` and `api_url` does not use the
     ///   `https://` scheme.
+    /// - `config.timeout_secs` is `0` (a zero timeout would cancel every request
+    ///   immediately).
     pub fn new(config: ArtifactoryCfg) -> ArtifactoryResult<Self> {
         if config.require_https && !config.api_url.starts_with("https://") {
             return Err(ArtifactoryError::InvalidConfig(format!(
                 "require_https is enabled but api_url does not use HTTPS: {}",
                 config.api_url
             )));
+        }
+        if config.timeout_secs == 0 {
+            return Err(ArtifactoryError::InvalidConfig(
+                "timeout_secs must be greater than zero".to_string(),
+            ));
         }
         let mut headers = HeaderMap::new();
         headers.insert(USER_AGENT_BLDR.0.clone(), USER_AGENT_BLDR.1.clone());
@@ -74,6 +86,7 @@ impl ArtifactoryClient {
             api_url: config.api_url,
             api_key: config.api_key,
             repo: config.repo,
+            timeout: Duration::from_secs(config.timeout_secs),
         })
     }
 
@@ -100,6 +113,7 @@ impl ArtifactoryClient {
         let resp = match self
             .inner
             .put(&url)
+            .timeout(self.timeout)
             .body(body)
             .send()
             .await
@@ -152,6 +166,7 @@ impl ArtifactoryClient {
         let resp = match self
             .inner
             .get(&url)
+            .timeout(self.timeout)
             .send()
             .await
             .map_err(ArtifactoryError::HttpClient)
@@ -209,6 +224,7 @@ impl ArtifactoryClient {
         let resp = match self
             .inner
             .delete(&url)
+            .timeout(self.timeout)
             .send()
             .await
             .map_err(ArtifactoryError::HttpClient)
@@ -358,6 +374,44 @@ mod tests {
         assert!(
             result.is_ok(),
             "require_https=true should accept an HTTPS URL, got: {:?}",
+            result.err().map(|e| e.to_string())
+        );
+    }
+
+    // --- timeout validation tests -------------------------------------------
+
+    /// `timeout_secs = 0` must be rejected: a zero timeout cancels every request
+    /// before it can be sent.
+    #[test]
+    fn timeout_zero_is_rejected() {
+        let cfg = ArtifactoryCfg {
+            timeout_secs: 0,
+            ..Default::default()
+        };
+        let result = ArtifactoryClient::new(cfg);
+        assert!(
+            result.is_err(),
+            "timeout_secs=0 must be rejected, but new() returned Ok"
+        );
+        let msg = format!("{}", result.err().unwrap());
+        assert!(
+            msg.contains("timeout_secs"),
+            "error message should mention timeout_secs, got: {}",
+            msg
+        );
+    }
+
+    /// A non-zero `timeout_secs` must be accepted and construction must succeed.
+    #[test]
+    fn timeout_nonzero_is_accepted() {
+        let cfg = ArtifactoryCfg {
+            timeout_secs: 5,
+            ..Default::default()
+        };
+        let result = ArtifactoryClient::new(cfg);
+        assert!(
+            result.is_ok(),
+            "timeout_secs=5 should be accepted, got: {:?}",
             result.err().map(|e| e.to_string())
         );
     }
