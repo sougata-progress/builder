@@ -26,13 +26,42 @@ pub struct ArtifactoryCfg {
     /// Artifactory API key
     pub api_key: String,
     // Repo name
-    pub repo:    String,
+    pub repo: String,
 }
 
 impl Default for ArtifactoryCfg {
     fn default() -> Self {
-        ArtifactoryCfg { api_url: DEFAULT_ARTIFACTORY_API_URL.to_string(),
-                         api_key: "".to_string(),
-                         repo:    DEFAULT_ARTIFACTORY_REPO.to_string(), }
+        ArtifactoryCfg {
+            api_url: DEFAULT_ARTIFACTORY_API_URL.to_string(),
+            api_key: "".to_string(),
+            repo: DEFAULT_ARTIFACTORY_REPO.to_string(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_cfg_uses_expected_constants() {
+        let cfg = ArtifactoryCfg::default();
+        assert_eq!(cfg.api_url, DEFAULT_ARTIFACTORY_API_URL);
+        assert_eq!(cfg.repo, DEFAULT_ARTIFACTORY_REPO);
+        assert!(
+            cfg.api_key.is_empty(),
+            "api_key should be empty string by default"
+        );
+    }
+
+    #[test]
+    fn default_api_url_is_localhost() {
+        // Ensures the constant itself stays a local dev URL and is never
+        // accidentally changed to a production endpoint.
+        assert!(
+            DEFAULT_ARTIFACTORY_API_URL.starts_with("http://localhost"),
+            "DEFAULT_ARTIFACTORY_API_URL must be a localhost URL, got: {}",
+            DEFAULT_ARTIFACTORY_API_URL
+        );
     }
 }

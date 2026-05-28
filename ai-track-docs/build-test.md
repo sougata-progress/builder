@@ -1,5 +1,32 @@
 # Build & Test Guide
 
+## Quick Reference – Exact Commands for `artifactory-client`
+
+```bash
+# 1. Build the crate only (no network services needed)
+cargo build -p artifactory-client
+
+# 2. Run its tests (all unit tests, no network or DB required)
+cargo test -p artifactory-client
+
+# 3. Run a single named test by filter
+cargo test -p artifactory-client default_cfg_uses_expected_constants
+
+# 4. Clippy for the crate
+cargo clippy -p artifactory-client -- -D warnings
+
+# 5. Format check
+cargo fmt -p artifactory-client -- --check
+
+# 6. Build + test the whole workspace (slower, requires no live services for unit tests)
+cargo build --workspace
+cargo test --workspace
+```
+
+> **Toolchain**: pinned to `1.91.1` in `rust-toolchain`. Run `rustup show` to confirm the active toolchain matches before building.
+
+---
+
 ## Prerequisites
 
 | Tool | Purpose |
