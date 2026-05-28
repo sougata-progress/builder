@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// URL to GitHub API endpoint
+/// Base URL for the Artifactory API
 pub const DEFAULT_ARTIFACTORY_API_URL: &str = "http://localhost:8081";
 
 /// Default repository name
@@ -25,7 +25,7 @@ pub struct ArtifactoryCfg {
     pub api_url: String,
     /// Artifactory API key
     pub api_key: String,
-    // Repo name
+    /// Repository name
     pub repo: String,
 }
 
@@ -33,7 +33,7 @@ impl Default for ArtifactoryCfg {
     fn default() -> Self {
         ArtifactoryCfg {
             api_url: DEFAULT_ARTIFACTORY_API_URL.to_string(),
-            api_key: "".to_string(),
+            api_key: String::new(),
             repo: DEFAULT_ARTIFACTORY_REPO.to_string(),
         }
     }
