@@ -35,3 +35,24 @@ test/test_helper
 
 #### For copilot
 builder.code-workspace
+
+#### Secret / credential files – never commit real values
+# Environment files that may contain tokens or keys
+.env
+.env.*
+!.env.sample
+!.env.example
+# direnv layout file (may capture real token values at runtime)
+.envrc.local
+# Unencrypted private keys and certificates
+*.pem
+!support/ci/*.pem.enc
+*.key
+!*.sig.key
+!*.sym.key
+*.p12
+*.pfx
+# Editor / OS artefacts that sometimes cache credentials
+*.bak
+.idea/
+*.iml

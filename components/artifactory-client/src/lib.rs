@@ -12,6 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// ---------------------------------------------------------------------------
+// Lint policy
+//
+// Enabled (warn)
+//   clippy::pedantic       – catches a broad class of style/correctness issues
+//                            (module_name_repetitions and missing_errors_doc are
+//                            suppressed below as they are too noisy for this
+//                            codebase's naming conventions and doc style)
+//
+// Allowed (suppress noisy pedantic sub-lints)
+//   clippy::module_name_repetitions  – `ArtifactoryClient`, `ArtifactoryCfg` etc.
+//                                      intentionally repeat the module name for clarity
+//   clippy::missing_errors_doc       – all public fallible fns already describe
+//                                      their error conditions in prose; a formal
+//                                      `# Errors` section adds no new information
+// ---------------------------------------------------------------------------
+#![warn(clippy::pedantic)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::missing_errors_doc)]
+
 #[macro_use]
 extern crate log;
 #[macro_use]
@@ -23,7 +43,8 @@ pub mod error;
 
 use habitat_core as hab_core;
 
-pub use crate::{client::ArtifactoryClient,
-                config::ArtifactoryCfg,
-                error::{ArtifactoryError,
-                        ArtifactoryResult}};
+pub use crate::{
+    client::ArtifactoryClient,
+    config::ArtifactoryCfg,
+    error::{ArtifactoryError, ArtifactoryResult},
+};

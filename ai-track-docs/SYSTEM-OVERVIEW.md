@@ -136,6 +136,43 @@ lib.rs      – re-exports (29 lines)
 - Secrets and tokens must never be committed; use environment variables or Habitat config injection.
 - All PR branches follow the pattern `<JIRA-ID>` (e.g., `BLDR-1234`).
 
+## Secret Hygiene
+
+### Runtime secrets (never commit)
+| Secret | Where it lives at runtime | How to supply locally |
+|---|---|---|
+| `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` | Environment variables | Copy `.secrets/habitat-env.sample` → `.secrets/habitat-env`, fill in values |
+| `HAB_AUTH_TOKEN` | `~/.hab/etc/cli.toml` (user-local) | `hab cli setup` |
+| Artifactory `api_key` | `ArtifactoryCfg.api_key` field | Set via TOML config injected at deploy time |
+| GitHub App private key | CI-encrypted `.pem.enc` file | Decrypted by CI only; never store plaintext |
+
+### Gitignore coverage (as of 2026-05-28)
+- `.secrets/*` is ignored; only `.secrets/habitat-env.sample` (placeholder values) is tracked.
+- `.env`, `.env.*` (except `*.sample`/`*.example`) are ignored.
+- Unencrypted `*.pem` and `*.p12`/`*.pfx` are ignored; encrypted `*.pem.enc` in `support/ci/` is allowed.
+- `terraform.tfstate*` is ignored (may contain infra credentials).
+
+### Remediation performed (2026-05-28)
+**Risk**: `.secrets/habitat-env.sample` contained committed OAuth App credentials
+(`OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `GITHUB_APP_ID`) pointing at a real
+GitHub OAuth App registration. Even "dev" credentials must not be committed —
+they may be reused or give attackers a foothold.
+
+**Fix**: Replaced real values with `<YOUR_OAUTH_CLIENT_ID>`, `<YOUR_OAUTH_CLIENT_SECRET>`,
+and `<YOUR_GITHUB_APP_ID>` placeholders. Added a header comment directing developers
+to fill in values locally without committing them.
+
+**If you suspect any secret was previously exposed**: rotate it immediately via the
+GitHub OAuth Apps settings page and revoke all existing tokens issued with that client.
+
+### Code-level rules
+- `ArtifactoryClient::new` validates `api_key` before inserting it into HTTP headers
+  (rejects control characters — guards against header injection).
+- No secret should appear in `format!("{:?}", config)` output; ensure `Debug` impls
+  on config structs redact sensitive fields.
+- Use `String::new()` (empty) as the default for credential fields, never a placeholder
+  string like `"CHANGEME"` — empty strings fail fast and are easy to detect.
+
 ## Related Docs
 - [Architecture diagram](architecture.mmd)
 - [Build & Test guide](build-test.md)

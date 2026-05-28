@@ -5,11 +5,49 @@ authors = ["The Habitat Maintainers <humans@habitat.sh>"]
 workspace = "../../"
 edition = "2018"
 
+# ---------------------------------------------------------------------------
+# Dependency notes (updated 2026-05-28)
+#
+# Resolved versions (from `cargo tree -p artifactory-client --depth 1`):
+#   futures       0.3.32   – stream combinators for download body streaming
+#   log           0.4.29   – structured logging macros (debug!/error!/warn!)
+#   reqwest       0.13.2   – async HTTP client; TLS via rustls (no OpenSSL)
+#   serde         1.0.228  – serialisation; needed by ArtifactoryCfg serde(default)
+#   serde_derive  1.0.228  – proc-macro for #[derive(Serialize, Deserialize)]
+#   tokio         1.50.0   – async runtime; only "fs" feature used here
+#   habitat_core  0.0.0    – git dep pinned to commit aff457eb; provides
+#                            PackageIdent / PackageArchive / PackageTarget
+#   builder_core  (path)   – workspace sibling; provides HttpClient
+#
+# Pinning rationale:
+#   All "*" specs are deliberately loose so the workspace Cargo.lock governs
+#   the single resolved version across all crates.  Pinning here would create
+#   a second constraint that could conflict with builder_core (which shares
+#   reqwest and serde).  The Cargo.lock already acts as the hard pin.
+#
+#   Minimal lower bounds are expressed below to document the features/APIs
+#   this crate actually depends on, without restricting workspace upgrades:
+#
+#   reqwest  >= 0.12   – `bytes_stream()` on Response, `stream` feature stable
+#   tokio    >= 1.0    – `tokio::fs::read`, `AsyncWriteExt` stable since 1.0
+#   futures  >= 0.3    – `StreamExt::next` stable since 0.3
+#   serde    >= 1.0    – `#[serde(default)]` stable since 1.0
+#   log      >= 0.4    – `debug!`/`error!`/`warn!` macros stable since 0.4
+#
+# TLS stack: rustls (via reqwest default features) – no native-tls or OpenSSL.
+#   Upgrade rustls with care; rustls 0.22→0.23 was a breaking API change.
+#
+# habitat_core git pin:
+#   Pinned to a specific commit in Cargo.lock.  To update, bump the commit
+#   reference in Cargo.lock via `cargo update -p habitat_core`.
+#   Do NOT change the git URL here without coordinating with builder_core.
+# ---------------------------------------------------------------------------
+
 [dependencies]
-log = "*"
-futures = "*"
-serde = "*"
-serde_derive = "*"
+log = ">=0.4"
+futures = ">=0.3"
+serde = ">=1.0"
+serde_derive = ">=1.0"
 
 [dependencies.habitat_core]
 git = "https://github.com/habitat-sh/habitat.git"
@@ -18,11 +56,11 @@ git = "https://github.com/habitat-sh/habitat.git"
 path = "../builder-core"
 
 [dependencies.tokio]
-version = "*"
+version = ">=1.0"
 features = ["fs"]
 
 [dependencies.reqwest]
-version = "*"
+version = ">=0.12"
 features = ["stream"]
 
 [package.metadata.cargo-machete]
