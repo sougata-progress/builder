@@ -37,6 +37,21 @@ pub struct ArtifactoryCfg {
     pub api_key: String,
     /// Repository name within Artifactory that holds `.hart` artifacts.
     pub repo: String,
+    /// When `true`, [`ArtifactoryClient::new`](crate::ArtifactoryClient::new) rejects any
+    /// `api_url` that does not start with `https://`.
+    ///
+    /// **Toggle behaviour**
+    /// | Value | Effect |
+    /// |---|---|
+    /// | `false` (default) | Any URL scheme is accepted; HTTP is allowed for local dev. |
+    /// | `true` | Construction fails with [`ArtifactoryError::InvalidConfig`](crate::ArtifactoryError::InvalidConfig) if `api_url` is not HTTPS. Enable this in any non-development environment. |
+    ///
+    /// Set via TOML:
+    /// ```toml
+    /// [artifactory]
+    /// require_https = true
+    /// ```
+    pub require_https: bool,
 }
 
 impl Default for ArtifactoryCfg {
@@ -47,6 +62,7 @@ impl Default for ArtifactoryCfg {
             api_url: DEFAULT_ARTIFACTORY_API_URL.to_string(),
             api_key: String::new(),
             repo: DEFAULT_ARTIFACTORY_REPO.to_string(),
+            require_https: false,
         }
     }
 }
@@ -63,6 +79,10 @@ mod tests {
         assert!(
             cfg.api_key.is_empty(),
             "api_key should be empty string by default"
+        );
+        assert!(
+            !cfg.require_https,
+            "require_https should be false by default (allows HTTP for local dev)"
         );
     }
 

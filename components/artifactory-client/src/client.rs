@@ -47,10 +47,19 @@ impl ArtifactoryClient {
     /// Construct a new client from the given configuration.
     ///
     /// Injects the `User-Agent` and `x-jfrog-art-api` headers into every
-    /// request. Returns an error if `config.api_url` is not a valid base URL
-    /// or if `config.api_key` contains characters that are not valid in an
-    /// HTTP header value (e.g. ASCII control characters).
+    /// request. Returns an error if:
+    /// - `config.api_url` is not a valid base URL.
+    /// - `config.api_key` contains characters that are not valid in an HTTP
+    ///   header value (e.g. ASCII control characters).
+    /// - `config.require_https` is `true` and `api_url` does not use the
+    ///   `https://` scheme.
     pub fn new(config: ArtifactoryCfg) -> ArtifactoryResult<Self> {
+        if config.require_https && !config.api_url.starts_with("https://") {
+            return Err(ArtifactoryError::InvalidConfig(format!(
+                "require_https is enabled but api_url does not use HTTPS: {}",
+                config.api_url
+            )));
+        }
         let mut headers = HeaderMap::new();
         headers.insert(USER_AGENT_BLDR.0.clone(), USER_AGENT_BLDR.1.clone());
         let api_key_header = HeaderValue::from_str(&config.api_key).map_err(|_| {
@@ -289,6 +298,67 @@ mod tests {
             msg.contains("api_key"),
             "error message should mention api_key, got: {}",
             msg
+        );
+    }
+
+    // --- require_https toggle tests -----------------------------------------
+
+    /// Toggle OFF (default): HTTP URL must be accepted.
+    #[test]
+    fn require_https_off_accepts_http_url() {
+        let cfg = ArtifactoryCfg {
+            api_url: "http://artifactory.local:8081".to_string(),
+            require_https: false,
+            ..Default::default()
+        };
+        // new() validates config synchronously; no network call is made here.
+        let result = ArtifactoryClient::new(cfg);
+        assert!(
+            result.is_ok(),
+            "require_https=false should accept an HTTP URL, got: {:?}",
+            result.err().map(|e| e.to_string())
+        );
+    }
+
+    /// Toggle ON: HTTP URL must be rejected with a clear InvalidConfig error.
+    #[test]
+    fn require_https_on_rejects_http_url() {
+        let cfg = ArtifactoryCfg {
+            api_url: "http://artifactory.local:8081".to_string(),
+            require_https: true,
+            ..Default::default()
+        };
+        let result = ArtifactoryClient::new(cfg);
+        assert!(
+            result.is_err(),
+            "require_https=true must reject an HTTP URL"
+        );
+        let msg = format!("{}", result.err().unwrap());
+        assert!(
+            msg.contains("require_https"),
+            "error should mention require_https, got: {}",
+            msg
+        );
+        assert!(
+            msg.contains("http://"),
+            "error should include the offending URL, got: {}",
+            msg
+        );
+    }
+
+    /// Toggle ON: HTTPS URL must be accepted.
+    #[test]
+    fn require_https_on_accepts_https_url() {
+        let cfg = ArtifactoryCfg {
+            api_url: "https://artifactory.example.com".to_string(),
+            require_https: true,
+            ..Default::default()
+        };
+        let result = ArtifactoryClient::new(cfg);
+        assert!(
+            result.is_ok(),
+            "require_https=true should accept an HTTPS URL, got: {:?}",
+            result.err().map(|e| e.to_string())
         );
     }
 }

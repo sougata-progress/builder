@@ -51,9 +51,21 @@ src/
 1. Add the field to `ArtifactoryCfg` in `config.rs` with a `///` doc comment.
 2. Add a matching `DEFAULT_*` constant if a sensible default exists.
 3. Update `Default::default()` to populate the field.
-4. Update `ArtifactoryClient::new` to consume the field (add it to the struct
-   and pass it into `HttpClient` or store it as a plain field).
+4. Update `ArtifactoryClient::new` to consume the field (validate early — before creating
+   headers or calling `HttpClient::new` — so the error is returned synchronously).
 5. Add an assertion in `default_cfg_uses_expected_constants` to pin the default.
+
+### Example: the `require_https` toggle
+
+`require_https: bool` is a minimal feature toggle added to illustrate this pattern:
+
+- **Default `false`** — preserves existing behaviour (HTTP is accepted for local dev).
+- **`true`** — `new()` returns `Err(InvalidConfig(...))` before any network call if
+  `api_url` doesn't start with `https://`.
+- Set in TOML: `require_https = true` under `[artifactory]`.
+- Three unit tests cover the toggle: OFF+HTTP=ok, ON+HTTP=err, ON+HTTPS=ok.
+
+Apply the same pattern for any new optional validation or behaviour gate.
 
 ---
 
