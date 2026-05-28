@@ -28,8 +28,13 @@ use crate::hab_core::package::{PackageArchive, PackageIdent, PackageTarget};
 
 use builder_core::http_client::{HttpClient, USER_AGENT_BLDR};
 use tokio::io::AsyncWriteExt;
+/// HTTP header name required by Artifactory for API key authentication.
 const X_JFROG_ART_API: &str = "x-jfrog-art-api";
 
+/// Async HTTP client for the Artifactory REST API.
+///
+/// Construct once via [`ArtifactoryClient::new`] and share across tasks
+/// (it is `Clone` and backed by a connection-pooled [`HttpClient`]).
 #[derive(Clone)]
 pub struct ArtifactoryClient {
     inner: HttpClient,
@@ -39,6 +44,10 @@ pub struct ArtifactoryClient {
 }
 
 impl ArtifactoryClient {
+    /// Construct a new client from the given configuration.
+    ///
+    /// Injects the `User-Agent` and `x-jfrog-art-api` headers into every
+    /// request. Returns an error if `config.api_url` is not a valid base URL.
     pub fn new(config: ArtifactoryCfg) -> ArtifactoryResult<Self> {
         let mut headers = HeaderMap::new();
         headers.insert(USER_AGENT_BLDR.0.clone(), USER_AGENT_BLDR.1.clone());
@@ -55,6 +64,11 @@ impl ArtifactoryClient {
         })
     }
 
+    /// Upload a `.hart` file to Artifactory.
+    ///
+    /// Reads `source_path` from disk and HTTP-PUTs it to the path derived from
+    /// `ident` and `target`. Returns the raw [`Response`] on success so callers
+    /// can inspect Artifactory-specific headers if needed.
     pub async fn upload(
         &self,
         source_path: &Path,
@@ -99,6 +113,10 @@ impl ArtifactoryClient {
         }
     }
 
+    /// Download a `.hart` file from Artifactory and write it to `destination_path`.
+    ///
+    /// Streams the response body to avoid loading the entire archive into memory.
+    /// Returns a [`PackageArchive`] handle pointing at the written file.
     pub async fn download(
         &self,
         destination_path: &Path,
@@ -147,6 +165,10 @@ impl ArtifactoryClient {
         }
     }
 
+    /// Delete an artifact from Artifactory.
+    ///
+    /// Treats `404 Not Found` and `410 Gone` as success so that delete is
+    /// idempotent — safe to call even if the artifact was already removed.
     pub async fn delete(
         &self,
         ident: &PackageIdent,
@@ -190,6 +212,12 @@ impl ArtifactoryClient {
         }
     }
 
+    /// Build the full Artifactory URL for a given package identity and target.
+    ///
+    /// Pattern: `<api_url>/artifactory/<repo>/<origin>/<name>/<version>/<release>/<target>/<hart>`
+    ///
+    /// # Panics
+    /// Panics if `ident` is not fully qualified (missing version or release).
     fn url_path_for(&self, ident: &PackageIdent, target: PackageTarget) -> String {
         let hart_name = ident
             .archive_name_with_target(target)

@@ -12,24 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Base URL for the Artifactory API
+/// Base URL for the Artifactory API.
+///
+/// Used as the default when no `api_url` is present in the TOML config.
+/// Override this for production deployments.
 pub const DEFAULT_ARTIFACTORY_API_URL: &str = "http://localhost:8081";
 
-/// Default repository name
+/// Default Artifactory repository that stores `.hart` packages.
+///
+/// Override via `ArtifactoryCfg::repo` for custom repository layouts.
 pub const DEFAULT_ARTIFACTORY_REPO: &str = "habitat-artifact-store";
 
+/// Runtime configuration for [`ArtifactoryClient`](crate::ArtifactoryClient).
+///
+/// Deserialized from the `[artifactory]` table in the service TOML config.
+/// All fields fall back to the module-level `DEFAULT_*` constants when absent.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct ArtifactoryCfg {
-    /// URL to Artifactory API
+    /// Full base URL of the Artifactory instance, e.g. `https://artifactory.example.com`.
     pub api_url: String,
-    /// Artifactory API key
+    /// Artifactory API key used for authentication via the `x-jfrog-art-api` header.
+    /// Leave empty to disable authenticated requests (local dev only).
     pub api_key: String,
-    /// Repository name
+    /// Repository name within Artifactory that holds `.hart` artifacts.
     pub repo: String,
 }
 
 impl Default for ArtifactoryCfg {
+    /// Returns a configuration pointing at a local Artifactory instance with no
+    /// authentication. Suitable for development; always override for production.
     fn default() -> Self {
         ArtifactoryCfg {
             api_url: DEFAULT_ARTIFACTORY_API_URL.to_string(),
