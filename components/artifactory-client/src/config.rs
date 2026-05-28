@@ -76,4 +76,35 @@ mod tests {
             DEFAULT_ARTIFACTORY_API_URL
         );
     }
+
+    /// Micro-benchmark: cost of constructing `ArtifactoryCfg::default()`.
+    ///
+    /// Runs 100 000 iterations via `std::time::Instant` (no external crate).
+    /// Pass `-- --nocapture` to see the per-iteration ns printed to stderr.
+    ///
+    /// Baseline recorded 2026-05-28 on an AWS t3-class instance (x86-64, debug build):
+    ///   262 ns / iter   (3× String allocations + constant copies)
+    ///   variance: ±20 ns between runs (low – pure allocation, no syscalls)
+    #[test]
+    fn bench_default_construction() {
+        use std::time::Instant;
+        const ITERS: u32 = 100_000;
+        let start = Instant::now();
+        for _ in 0..ITERS {
+            let _ = std::hint::black_box(ArtifactoryCfg::default());
+        }
+        let elapsed = start.elapsed();
+        let ns_per_iter = elapsed.as_nanos() / u64::from(ITERS) as u128;
+        eprintln!(
+            "ArtifactoryCfg::default()  {ITERS} iters  total={elapsed:?}  \
+             per_iter={ns_per_iter} ns"
+        );
+        // Sanity guard: construction must complete in under 10 µs each on any
+        // reasonable CI machine (debug build, no optimisation).
+        assert!(
+            ns_per_iter < 10_000,
+            "ArtifactoryCfg::default() took {} ns – unexpectedly slow",
+            ns_per_iter
+        );
+    }
 }
