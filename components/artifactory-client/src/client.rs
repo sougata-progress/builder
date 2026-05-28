@@ -47,14 +47,18 @@ impl ArtifactoryClient {
     /// Construct a new client from the given configuration.
     ///
     /// Injects the `User-Agent` and `x-jfrog-art-api` headers into every
-    /// request. Returns an error if `config.api_url` is not a valid base URL.
+    /// request. Returns an error if `config.api_url` is not a valid base URL
+    /// or if `config.api_key` contains characters that are not valid in an
+    /// HTTP header value (e.g. ASCII control characters).
     pub fn new(config: ArtifactoryCfg) -> ArtifactoryResult<Self> {
         let mut headers = HeaderMap::new();
         headers.insert(USER_AGENT_BLDR.0.clone(), USER_AGENT_BLDR.1.clone());
-        headers.insert(
-            HeaderName::from_static(X_JFROG_ART_API),
-            HeaderValue::from_str(&config.api_key).expect("Invalid API key value"),
-        );
+        let api_key_header = HeaderValue::from_str(&config.api_key).map_err(|_| {
+            ArtifactoryError::InvalidConfig(format!(
+                "api_key contains characters that are invalid in an HTTP header value"
+            ))
+        })?;
+        headers.insert(HeaderName::from_static(X_JFROG_ART_API), api_key_header);
 
         Ok(ArtifactoryClient {
             inner: HttpClient::new(&config.api_url, headers)?,
@@ -231,5 +235,33 @@ impl ArtifactoryClient {
             target.iter().collect::<Vec<&str>>().join("/"),
             hart_name
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ArtifactoryCfg;
+
+    #[test]
+    fn new_rejects_api_key_with_control_characters() {
+        // A newline in an HTTP header value is invalid (potential header injection).
+        // `new` must return Err rather than panic.
+        let cfg = ArtifactoryCfg {
+            api_key: "valid-prefix\ninvalid".to_string(),
+            ..Default::default()
+        };
+        let result = ArtifactoryClient::new(cfg);
+        assert!(
+            result.is_err(),
+            "expected Err for api_key containing a newline, got Ok"
+        );
+        // Confirm the error message is descriptive.
+        let msg = format!("{}", result.err().unwrap());
+        assert!(
+            msg.contains("api_key"),
+            "error message should mention api_key, got: {}",
+            msg
+        );
     }
 }
