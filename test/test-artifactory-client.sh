@@ -89,7 +89,9 @@ else
         cargo test -p "$CRATE" --lib
 fi
 
-# 4. Clippy (deny warnings — same bar as CI would use)
+# 4. Clippy — deny all warnings (includes pedantic lints declared in lib.rs
+#    via #![warn(clippy::pedantic)]; the pedantic attribute applies only to this
+#    crate's source, so dependency warnings do not bleed in).
 run_check "Lint (cargo clippy)" \
     cargo clippy -p "$CRATE" -- -D warnings
 

@@ -71,6 +71,53 @@ cargo test --workspace
 
 ---
 
+## Lint Policy (`artifactory-client`)
+
+### How lints are layered
+
+There are two independently-controlled lint layers:
+
+| Layer | Mechanism | Scope |
+|---|---|---|
+| **Crate-level attributes** | `#![warn(...)]` / `#![allow(...)]` in `src/lib.rs` | Our crate's source only — never affects dependencies |
+| **CLI flag** | `-D warnings` passed to `cargo clippy` | Turns every remaining warning into a build error |
+
+The CLI flag `-W clippy::pedantic` would apply pedantic lints to every crate in the
+compilation graph, including dependencies that are not under our control.
+**Do not use it on the CLI.** Use the crate-level attribute for targeted pedantic lints.
+
+### Active lint attributes in `src/lib.rs`
+
+```rust
+#![warn(clippy::pedantic)]                  // broad style/correctness coverage
+#![allow(clippy::module_name_repetitions)]  // ArtifactoryClient, ArtifactoryCfg etc.
+                                             // intentionally repeat the module name
+#![allow(clippy::missing_errors_doc)]       // error conditions documented in prose;
+                                             // a formal # Errors section adds nothing
+```
+
+### Running lints
+
+```bash
+# Standard lint check used by the local test script:
+cargo clippy -p artifactory-client -- -D warnings
+
+# View pedantic findings across the crate (safe — pedantic only applies to our files):
+cargo clippy -p artifactory-client -- -D warnings 2>&1 | grep "artifactory-client"
+```
+
+### Suppressing a lint locally
+
+If a single site needs to override a crate-level warn, use a line-level `#[allow(...)]`
+with an explanatory comment, never a blanket crate-level `#![allow(...)]`:
+
+```rust
+#[allow(clippy::cast_precision_loss)] // iteration count fits comfortably in f64
+let pct = (done as f64 / total as f64) * 100.0;
+```
+
+---
+
 ## Prerequisites
 
 | Tool | Purpose |

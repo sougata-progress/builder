@@ -30,19 +30,16 @@ pub enum ArtifactoryError {
 impl fmt::Display for ArtifactoryError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let msg = match *self {
-            ArtifactoryError::HttpClient(ref e) => format!("{}", e),
+            ArtifactoryError::HttpClient(ref e) => format!("{e}"),
             ArtifactoryError::ApiError(ref code, ref response) => {
-                format!(
-                    "Received a non-200 response, status={}, response={:?}",
-                    code, response
-                )
+                format!("Received a non-200 response, status={code}, response={response:?}")
             }
-            ArtifactoryError::BuilderCore(ref e) => format!("{}", e),
-            ArtifactoryError::IO(ref e) => format!("{}", e),
-            ArtifactoryError::HabitatCore(ref e) => format!("{}", e),
-            ArtifactoryError::InvalidConfig(ref msg) => format!("Invalid configuration: {}", msg),
+            ArtifactoryError::BuilderCore(ref e) => format!("{e}"),
+            ArtifactoryError::IO(ref e) => format!("{e}"),
+            ArtifactoryError::HabitatCore(ref e) => format!("{e}"),
+            ArtifactoryError::InvalidConfig(ref msg) => format!("Invalid configuration: {msg}"),
         };
-        write!(f, "{}", msg)
+        write!(f, "{msg}")
     }
 }
 

@@ -89,7 +89,7 @@ impl ArtifactoryClient {
         target: PackageTarget,
     ) -> ArtifactoryResult<Response> {
         let url = self.url_path_for(ident, target);
-        debug!("op=upload url={}", url);
+        debug!("op=upload url={url}");
 
         let body: Body = tokio::fs::read(source_path)
             .await
@@ -146,7 +146,7 @@ impl ArtifactoryClient {
         target: PackageTarget,
     ) -> ArtifactoryResult<PackageArchive> {
         let url = self.url_path_for(ident, target);
-        debug!("op=download url={}", url);
+        debug!("op=download url={url}");
 
         let t = Instant::now();
         let resp = match self
@@ -178,8 +178,8 @@ impl ArtifactoryClient {
             }
             let elapsed_ms = t.elapsed().as_millis();
             info!(
-                "op=download status=ok elapsed_ms={} dest={:?}",
-                elapsed_ms, destination_path
+                "op=download status=ok elapsed_ms={elapsed_ms} dest={}",
+                destination_path.display()
             );
             Ok(PackageArchive::new(destination_path)?)
         } else {
@@ -203,7 +203,7 @@ impl ArtifactoryClient {
         target: PackageTarget,
     ) -> ArtifactoryResult<()> {
         let url = self.url_path_for(ident, target);
-        debug!("op=delete url={}", url);
+        debug!("op=delete url={url}");
 
         let t = Instant::now();
         let resp = match self
