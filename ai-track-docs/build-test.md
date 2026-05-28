@@ -119,3 +119,68 @@ cargo run -p builder-db --bin builder-migrate
 | `can't find crate for 'message'` | Protobuf not generated | Run `cargo build -p builder-protocol` first |
 | `connection refused` in db tests | Postgres not running | `docker compose up -d` |
 | `npm ERR! peer dep` | Node version mismatch | Use Node 18 LTS |
+
+## Viewing Structured Logs (`artifactory-client`)
+
+All three public operations (`upload`, `download`, `delete`) emit log lines using
+a consistent key=value field schema:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `op` | string | Operation name: `upload`, `download`, `delete` |
+| `status` | string | `ok`, `error`, or `not_found` |
+| `elapsed_ms` | integer | Wall-clock time of the HTTP round-trip in milliseconds |
+| `http_status` | integer | Raw HTTP status code returned by Artifactory |
+| `url` | string | Full request URL (present on `debug!` lines and errors) |
+| `err` | string | Rust error message (present only on transport-level errors) |
+
+### Log levels used
+
+| Level | When |
+|---|---|
+| `debug` | Request URL before send — verbose, off by default |
+| `info` | Successful completion and idempotent 404/410 deletes |
+| `error` | HTTP errors and transport failures |
+
+### Enable and view logs locally
+
+```bash
+# Show info-level logs for artifactory-client only
+RUST_LOG=artifactory_client=info cargo run -p builder-api
+
+# Show all debug-level logs for the crate (verbose)
+RUST_LOG=artifactory_client=debug cargo run -p builder-api
+
+# Show info for everything, debug for this crate
+RUST_LOG=info,artifactory_client=debug cargo run -p builder-api
+```
+
+> `RUST_LOG` uses the **module path** as the filter key, which is the crate name
+> with hyphens replaced by underscores: `artifactory-client` → `artifactory_client`.
+
+### Example log output
+
+```
+# Successful upload
+INFO artifactory_client::client  op=upload status=ok elapsed_ms=142 http_status=200
+
+# Failed download (server error)
+ERROR artifactory_client::client  op=download status=error elapsed_ms=31 http_status=500
+
+# Idempotent delete (artifact already gone)
+INFO artifactory_client::client  op=delete status=not_found elapsed_ms=12 http_status=404 note=already_removed
+
+# Transport-level failure
+ERROR artifactory_client::client  op=upload status=error elapsed_ms=5002 url=http://… err=connection timed out
+```
+
+### Filtering in production (JSON logging pipeline)
+
+If `builder-api` is deployed with a JSON log formatter (e.g. `tracing-subscriber`
+in JSON mode), the key=value fields parse directly into structured JSON. To extract
+slow operations:
+
+```bash
+# Find any Artifactory op that took > 2000 ms (using jq)
+journalctl -u builder-api | jq 'select(.fields.elapsed_ms > 2000)'
+```

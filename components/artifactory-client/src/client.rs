@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, path::Path, time::Instant};
 
 use crate::{
     config::ArtifactoryCfg,
@@ -79,19 +79,15 @@ impl ArtifactoryClient {
         ident: &PackageIdent,
         target: PackageTarget,
     ) -> ArtifactoryResult<Response> {
-        debug!(
-            "ArtifactoryClient upload request for file path: {:?}",
-            source_path
-        );
-
         let url = self.url_path_for(ident, target);
-        debug!("ArtifactoryClient upload url = {}", url);
+        debug!("op=upload url={}", url);
 
         let body: Body = tokio::fs::read(source_path)
             .await
             .map_err(ArtifactoryError::IO)?
             .into();
 
+        let t = Instant::now();
         let resp = match self
             .inner
             .put(&url)
@@ -102,17 +98,30 @@ impl ArtifactoryClient {
         {
             Ok(resp) => resp,
             Err(err) => {
-                error!("ArtifactoryClient upload failed, err={}", err);
+                error!(
+                    "op=upload status=error elapsed_ms={} url={} err={}",
+                    t.elapsed().as_millis(),
+                    url,
+                    err
+                );
                 return Err(err);
             }
         };
-
-        debug!("Artifactory response status: {:?}", resp.status());
+        let elapsed_ms = t.elapsed().as_millis();
 
         if resp.status().is_success() {
+            info!(
+                "op=upload status=ok elapsed_ms={} http_status={}",
+                elapsed_ms,
+                resp.status().as_u16()
+            );
             Ok(resp)
         } else {
-            error!("Artifactory upload non-success status: {:?}", resp.status());
+            error!(
+                "op=upload status=error elapsed_ms={} http_status={}",
+                elapsed_ms,
+                resp.status().as_u16()
+            );
             Err(ArtifactoryError::ApiError(resp.status(), HashMap::new()))
         }
     }
@@ -127,14 +136,10 @@ impl ArtifactoryClient {
         ident: &PackageIdent,
         target: PackageTarget,
     ) -> ArtifactoryResult<PackageArchive> {
-        debug!(
-            "ArtifactoryClient download request for {} ({}) to destination path: {:?}",
-            ident, target, destination_path
-        );
-
         let url = self.url_path_for(ident, target);
-        debug!("ArtifactoryClient download url = {}", url);
+        debug!("op=download url={}", url);
 
+        let t = Instant::now();
         let resp = match self
             .inner
             .get(&url)
@@ -144,12 +149,15 @@ impl ArtifactoryClient {
         {
             Ok(resp) => resp,
             Err(err) => {
-                error!("ArtifactoryClient download failed, err={}", err);
+                error!(
+                    "op=download status=error elapsed_ms={} url={} err={}",
+                    t.elapsed().as_millis(),
+                    url,
+                    err
+                );
                 return Err(err);
             }
         };
-
-        debug!("Artifactory response status: {:?}", resp.status());
 
         if resp.status().is_success() {
             let mut file = tokio::fs::File::create(destination_path)
@@ -159,11 +167,18 @@ impl ArtifactoryClient {
             while let Some(chunk) = stream.next().await {
                 file.write_all(&chunk?).await?;
             }
+            let elapsed_ms = t.elapsed().as_millis();
+            info!(
+                "op=download status=ok elapsed_ms={} dest={:?}",
+                elapsed_ms, destination_path
+            );
             Ok(PackageArchive::new(destination_path)?)
         } else {
+            let elapsed_ms = t.elapsed().as_millis();
             error!(
-                "Artifactory download non-success status: {:?}",
-                resp.status()
+                "op=download status=error elapsed_ms={} http_status={}",
+                elapsed_ms,
+                resp.status().as_u16()
             );
             Err(ArtifactoryError::ApiError(resp.status(), HashMap::new()))
         }
@@ -179,8 +194,9 @@ impl ArtifactoryClient {
         target: PackageTarget,
     ) -> ArtifactoryResult<()> {
         let url = self.url_path_for(ident, target);
-        debug!("ArtifactoryClient delete url = {}", url);
+        debug!("op=delete url={}", url);
 
+        let t = Instant::now();
         let resp = match self
             .inner
             .delete(&url)
@@ -190,28 +206,39 @@ impl ArtifactoryClient {
         {
             Ok(resp) => resp,
             Err(err) => {
-                error!("ArtifactoryClient delete failed, err={}", err);
+                error!(
+                    "op=delete status=error elapsed_ms={} url={} err={}",
+                    t.elapsed().as_millis(),
+                    url,
+                    err
+                );
                 return Err(err);
             }
         };
-
-        debug!("Artifactory delete response status: {:?}", resp.status());
+        let elapsed_ms = t.elapsed().as_millis();
 
         if resp.status().is_success() {
+            info!(
+                "op=delete status=ok elapsed_ms={} http_status={}",
+                elapsed_ms,
+                resp.status().as_u16()
+            );
             Ok(())
         } else if resp.status() == reqwest::StatusCode::NOT_FOUND
             || resp.status() == reqwest::StatusCode::GONE
         {
-            warn!(
-                "Artifactory delete returned {} for {} ({}); artifact may have already been \
-                   removed",
-                resp.status(),
-                ident,
-                target
+            info!(
+                "op=delete status=not_found elapsed_ms={} http_status={} note=already_removed",
+                elapsed_ms,
+                resp.status().as_u16()
             );
             Ok(())
         } else {
-            error!("Artifactory delete non-success status: {:?}", resp.status());
+            error!(
+                "op=delete status=error elapsed_ms={} http_status={}",
+                elapsed_ms,
+                resp.status().as_u16()
+            );
             Err(ArtifactoryError::ApiError(resp.status(), HashMap::new()))
         }
     }
