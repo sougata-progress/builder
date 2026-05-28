@@ -54,9 +54,9 @@ impl ArtifactoryClient {
         let mut headers = HeaderMap::new();
         headers.insert(USER_AGENT_BLDR.0.clone(), USER_AGENT_BLDR.1.clone());
         let api_key_header = HeaderValue::from_str(&config.api_key).map_err(|_| {
-            ArtifactoryError::InvalidConfig(format!(
-                "api_key contains characters that are invalid in an HTTP header value"
-            ))
+            ArtifactoryError::InvalidConfig(
+                "api_key contains characters that are invalid in an HTTP header value".to_string(),
+            )
         })?;
         headers.insert(HeaderName::from_static(X_JFROG_ART_API), api_key_header);
 

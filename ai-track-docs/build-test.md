@@ -1,6 +1,50 @@
 # Build & Test Guide
 
-## Quick Reference – Exact Commands for `artifactory-client`
+## Local Test Script (`test/test-artifactory-client.sh`)
+
+A self-contained script that runs all four reliability checks for `artifactory-client`
+with no external dependencies (no Habitat packages, no Docker, no network):
+
+```bash
+# From the repository root:
+bash test/test-artifactory-client.sh
+
+# Verbose mode (prints individual test names and stdout):
+bash test/test-artifactory-client.sh --verbose
+```
+
+### What it runs, in order
+
+| Step | Command | Fails fast? |
+|---|---|---|
+| 1. Format check | `cargo fmt -p artifactory-client -- --check` | Yes |
+| 2. Build | `cargo build -p artifactory-client` | Yes |
+| 3. Unit tests | `cargo test -p artifactory-client --lib` | Yes |
+| 4. Lint | `cargo clippy -p artifactory-client -- -D warnings` | Yes |
+
+Each step prints `[PASS]` or `[FAIL]`. The script exits `0` only when all steps pass;
+any failure exits `1` and lists which steps failed. This makes it safe to use as a
+pre-push hook or in a future CI job.
+
+### Why CI doesn't currently run Rust tests
+
+The main CI workflow ([`.github/workflows/ci-main-pull-request-checks.yml`](.github/workflows/ci-main-pull-request-checks.yml))
+delegates to a central shared Action at `chef/common-github-actions` with
+`unit-tests: false` and `build: false`. The existing `test/run_cargo_test.sh`
+requires Habitat packages and a Buildkite environment. This local script fills
+that gap without modifying the central CI configuration.
+
+### Using as a git pre-push hook
+
+```bash
+# Install once per local clone:
+cp test/test-artifactory-client.sh .git/hooks/pre-push
+chmod +x .git/hooks/pre-push
+```
+
+---
+
+## Quick Reference – Individual Commands
 
 ```bash
 # 1. Build the crate only (no network services needed)
